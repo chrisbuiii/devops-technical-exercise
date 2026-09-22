@@ -1,0 +1,118 @@
+# Default values for the greeter chart.
+#
+# These defaults produce a sensible, safe deployment on their own. Terraform
+# overrides a small subset per environment (greeting name, replicas, version).
+
+image:
+  repository: greeter
+  tag: dev
+  # IfNotPresent because images are side-loaded into kind with `kind load`,
+  # so there is no registry to pull from.
+  pullPolicy: IfNotPresent
+
+# At least 2 so the service survives losing a single node. See
+# topologySpreadConstraints below, which forces the replicas onto different
+# nodes.
+replicaCount: 2
+
+# Rolling update strategy.
+#
+# maxSurge is 0 on purpose. The topology spread constraint below is a hard
+# "one pod per node" rule, and the local cluster has exactly two worker nodes.
+# Allowing a surge pod would create a third pod that has nowhere to go, and the
+# rollout would deadlock. With maxSurge=0/maxUnavailable=1 the rollout instead
+# frees a node by removing an old pod, then schedules the new one in its place.
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 0
+    maxUnavailable: 1
+
+# Application configuration. Everything here becomes environment variables via a
+# ConfigMap, so an operator can change any of it without rebuilding the image.
+config:
+  # Required by the app; it exits non-zero if this is empty.
+  greetingName: "World"
+  version: "1.0.0"
+  warmupSeconds: 30
+  shutdownDelaySeconds: 10
+  drainTimeoutSeconds: 20
+
+service:
+  type: ClusterIP
+  # Port the Service exposes.
+  port: 80
+  # Port the container listens on (the app's PORT, default 8080).
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  # Host used to reach the service from the machine running kind.
+  # http://localhost works because kind maps host :80 to the ingress controller.
+  host: localhost
+  path: /
+  pathType: Prefix
+
+# Small requests/limits: this is a tiny service on a local cluster. Requests are
+# set so the scheduler can place pods; limits cap noisy-neighbour blast radius.
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+# Must be greater than shutdownDelaySeconds + drainTimeoutSeconds (10 + 20 = 30)
+# so the kubelet does not SIGKILL the pod mid-drain. 45 leaves headroom.
+terminationGracePeriodSeconds: 45
+
+# Pod-level security context. runAsUser/runAsGroup are set to 65532, the numeric
+# UID/GID of the "nonroot" user baked into the distroless image. The numeric
+# form is required: with only a named user, the kubelet cannot verify the image
+# runs as non-root and refuses to start it when runAsNonRoot is true.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container-level hardening. readOnlyRootFilesystem is safe because the service
+# writes nothing to disk.
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Keep at least one pod serving during voluntary disruptions such as a node
+# drain (kubectl drain / rolling node maintenance).
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Probe tuning is driven by the app's documented behaviour:
+#   - /healthz is always 200 while the process is alive (including warm-up),
+#   - /readyz is 503 during warm-up and again during shutdown.
+probes:
+  # startupProbe guards a slow start (e.g. slow bind). It targets /healthz and
+  # gives the process up to failureThreshold*periodSeconds to come up before
+  # the liveness probe is allowed to act.
+  startup:
+    periodSeconds: 2
+    failureThreshold: 30 # up to 60s to start
+  # livenessProbe uses /healthz on purpose: a process that is still warming up
+  # is alive and must NOT be restarted. Using /readyz here would cause a
+  # CrashLoop during the warm-up window.
+  liveness:
+    periodSeconds: 10
+    failureThreshold: 3
+  # readinessProbe uses /readyz so the pod is pulled out of the Service while
+  # warming up and, importantly, the moment it starts draining on SIGTERM.
+  # A short period means traffic stops quickly once draining begins.
+  readiness:
+    periodSeconds: 3
+    failureThreshold: 2

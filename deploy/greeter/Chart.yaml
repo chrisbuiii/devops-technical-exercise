@@ -1,0 +1,11 @@
+apiVersion: v2
+name: greeter
+description: what3words greeter service - hand-written chart for the DevOps exercise
+type: application
+
+# Chart version is independent of the app. Bump it when the templates change.
+version: 0.1.0
+
+# The default application version. Overridden per environment from Terraform,
+# and surfaced by the app on /version and in the greeter_build_info metric.
+appVersion: "1.0.0"

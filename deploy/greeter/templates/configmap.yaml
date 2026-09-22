@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "greeter.fullname" . }}
+  labels:
+    {{- include "greeter.labels" . | nindent 4 }}
+data:
+  # GREETING_NAME is required; the app exits non-zero if it is empty. Keeping it
+  # here (not baked into the image) is what lets an operator change the greeting
+  # per environment without a rebuild.
+  GREETING_NAME: {{ .Values.config.greetingName | quote }}
+  VERSION: {{ .Values.config.version | quote }}
+  WARMUP_SECONDS: {{ .Values.config.warmupSeconds | quote }}
+  SHUTDOWN_DELAY_SECONDS: {{ .Values.config.shutdownDelaySeconds | quote }}
+  DRAIN_TIMEOUT_SECONDS: {{ .Values.config.drainTimeoutSeconds | quote }}

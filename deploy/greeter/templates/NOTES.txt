@@ -1,0 +1,25 @@
+{{ .Chart.Name }} ({{ .Release.Name }}) has been deployed.
+
+Configuration in effect:
+  greeting name : {{ .Values.config.greetingName }}
+  version       : {{ .Values.config.version }}
+  replicas      : {{ .Values.replicaCount }}
+
+{{- if .Values.ingress.enabled }}
+
+Reach it through the ingress (kind maps host :80 to the ingress controller):
+
+  curl http://{{ .Values.ingress.host }}/
+  curl http://{{ .Values.ingress.host }}/version
+  curl http://{{ .Values.ingress.host }}/readyz
+{{- else }}
+
+Ingress is disabled. Port-forward to reach the service:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "greeter.fullname" . }} 8080:{{ .Values.service.port }}
+  curl http://localhost:8080/
+{{- end }}
+
+Check rollout status:
+
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "greeter.fullname" . }}
