@@ -1,0 +1,17 @@
+# Keep the build context small: only app/ is needed to build the binary.
+.git
+.github
+*.md
+LICENSE
+
+# Infrastructure and tooling that must never end up in the image build context.
+cluster/
+deploy/
+terraform/
+observability/
+gitops/
+
+# Local/editor noise.
+.DS_Store
+.vscode/
+.idea/
