@@ -1,0 +1,111 @@
+name: CI
+
+# Run on every push, and on PRs targeting main. The push trigger is what gates
+# image publishing below.
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+# One run per ref; a newer push cancels an in-flight run on the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Gate on the app's own tests. CGO is disabled to match how the image is built.
+  app-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: app/go.mod
+      - name: go test
+        working-directory: app
+        run: CGO_ENABLED=0 go test ./...
+
+  # Catch chart errors (lint) and template rendering errors before they reach a
+  # cluster.
+  chart-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.15.4
+      - name: helm lint
+        run: helm lint deploy/greeter
+      - name: helm template renders
+        run: helm template greeter-ci deploy/greeter --set config.greetingName=CI > /dev/null
+
+  # Formatting and validation for both environments. -backend=false so no state
+  # backend is needed just to validate.
+  terraform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - name: terraform fmt
+        run: terraform fmt -check -recursive terraform
+      - name: validate dev
+        working-directory: terraform/environments/dev
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: validate prod
+        working-directory: terraform/environments/prod
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  # The scripts are part of the deliverable and must run cleanly on a fresh
+  # machine, so they are linted too.
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          # Fail on warnings and errors; info/style findings (e.g. SC2329 for
+          # trap-invoked functions) are not treated as failures.
+          shellcheck --severity=warning cluster/*.sh deploy/*.sh observability/*.sh survival/*.sh
+
+  # Build the image exactly as the cluster would, for both architectures, so a
+  # cross-compilation break is caught. Publish to GHCR only on main and tags;
+  # pull requests build but do not push.
+  image-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PUBLISH: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build (and push on main/tags)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ env.PUBLISH == 'true' }}
+          tags: |
+            ghcr.io/${{ github.repository }}/greeter:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/greeter:latest

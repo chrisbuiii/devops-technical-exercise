@@ -180,6 +180,29 @@ in production I would lengthen the window and tune the threshold to the service'
 normal error budget. `observability/demo-alert.sh` drives `/boom`, waits for the
 alert to reach `firing`, and prints the evidence.
 
+## Extension A (CI), as built
+
+`.github/workflows/ci.yml` runs on push and on PRs to main, with five jobs:
+
+- `app-test`: `go test ./...` with CGO disabled, matching the image build.
+- `chart-lint`: `helm lint` and a `helm template` render check.
+- `terraform-validate`: `terraform fmt -check` plus `init -backend=false` and
+  `validate` for both dev and prod.
+- `shellcheck`: lints every script, since the scripts are part of the
+  deliverable and are expected to run on a clean machine. Set to fail on
+  warnings and above; info/style findings (such as SC2329 for trap-invoked
+  functions) do not fail the build.
+- `image-build`: builds the image for linux/amd64 and linux/arm64 with Buildx so
+  a cross-compilation break is caught, and pushes to GHCR only on main and tags,
+  authenticating with the built-in `GITHUB_TOKEN`. Pull requests build but do
+  not publish.
+
+Honest limitation: there is no GitHub remote for this exercise, so the workflow
+has not run on GitHub Actions itself. Every step was instead verified locally -
+`go test`, `helm lint`/`template`, `terraform fmt`/`validate`, `shellcheck`, and
+a real multi-arch Buildx build all pass. I would expect first-run tweaks (action
+versions, GHCR permissions) when it actually runs, as always.
+
 ## Extension D (Prove it survives), as built
 
 The scripts in `survival/` put prod (3 replicas) under continuous load and
