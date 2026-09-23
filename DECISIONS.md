@@ -230,6 +230,55 @@ count on one node during the drain, then rebalances 2-1 once the node returns an
 the pods are next replaced. The trade-off noted earlier still stands for normal
 scheduling, but during a drain the combination behaves well.
 
+## Extension C (GitOps), as built
+
+The brief warns that repository authentication for GitOps can be a time sink, so
+I removed that risk by keeping the whole loop inside the cluster. `gitops/`
+brings up an in-cluster **gitea** (the git server) and **Argo CD**, so there is
+no external SaaS, no tokens to manage, and the demo runs the same on any machine.
+
+- `gitops/gitea.yaml`: a single gitea Deployment plus Service, SQLite on an
+  `emptyDir`. It is intentionally ephemeral - this is a demo git server, not a
+  system of record - which keeps the manifest small and the setup fast.
+- `gitops/install.sh`: deploys gitea, creates a user and a public repo over the
+  gitea API, pushes the current repo `HEAD` to it, installs Argo CD, and applies
+  the Application. It is idempotent so it can be re-run safely.
+- `gitops/application.yaml`: an Argo CD Application with automated sync,
+  self-heal, and prune. It uses a **multi-source** definition: the chart is read
+  from `deploy/greeter` and its values from `gitops/values-gitops.yaml` via a
+  `$values` ref, so GitOps reuses the exact same chart as Terraform rather than a
+  fork. Destination is the `greeter-gitops` namespace, created on first sync.
+- `gitops/demo-gitops.sh`: clones the gitea repo into a temp dir, changes the
+  greeting in `values-gitops.yaml`, commits and pushes, forces an Argo CD
+  refresh, and waits for the running service to serve the new greeting - without
+  ever touching the cluster directly. Evidence is in `gitops/evidence/`.
+
+The evidence (`gitops/evidence/gitops-sync.log`) shows the full loop: a commit
+moves the greeting from "GitOps" to "GitOps-reconciled", Argo CD syncs the new
+ConfigMap, the checksum annotation triggers a rolling update, and the service
+serves the new greeting - all driven by a git push, nothing applied by hand.
+
+A few things worth calling out:
+
+- **Server-side apply for Argo CD.** The Argo CD install manifest has CRDs whose
+  annotations exceed the 256KB client-side apply limit, so `install.sh` uses
+  `kubectl apply --server-side --force-conflicts`. This is the documented way to
+  install Argo CD and avoids the "metadata.annotations too long" failure.
+- **gitea admin user creation.** gitea refuses to create a user when the CLI runs
+  as root, so the script runs `gitea admin user create` as the `git` user via
+  `su git -c ...` inside the pod.
+- **Rollout timing in the demo.** With `maxSurge=0` and the warmup delay, the two
+  pods are replaced sequentially, so a correct reconcile can take a few minutes.
+  The demo polls generously and, importantly, decides success on the settled
+  state (the final greeting served) rather than only on the poll window, so a
+  slow-but-correct reconcile is not misreported as a failure.
+
+Honest limitations: gitea uses `emptyDir`, so its data (and the pushed repo) does
+not survive a pod restart; in a real setup the git server is external and durable.
+Argo CD runs with its defaults and no ingress or SSO - the loop is proven through
+the CLI and the Application status, which is enough evidence here without adding
+more moving parts.
+
 ## Extensions: the order I would do them, and why
 
 The order is B, then D, then A, then C.

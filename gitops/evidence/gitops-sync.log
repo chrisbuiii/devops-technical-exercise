@@ -1,0 +1,26 @@
+=== GitOps sync demo: Wed Sep 23 10:04:39 +07 2026 ===
+target=http://gitops.localhost  new_greeting=GitOps-reconciled
+
+==> Greeting before the commit:
+  Hello GitOps, welcome to the what3words platform.
+
+==> Port-forwarding gitea.
+==> Cloning the gitea repo into a temp dir (keeps the real repo history clean).
+==> Editing gitops/values-gitops.yaml: greetingName -> GitOps-reconciled
+==> Pushed commit f1c9287 to gitea.
+
+==> Forcing an Argo CD refresh.
+==> Waiting for Argo CD to reconcile the new commit (up to 300s).
+==> Waiting for the rollout to settle.
+Waiting for deployment "greeter" rollout to finish: 1 of 2 updated replicas are available...
+deployment "greeter" successfully rolled out
+
+==> Argo CD Application status:
+NAME      SYNC STATUS   HEALTH STATUS
+greeter   Synced        Progressing
+
+==> Greeting after the commit:
+  Hello GitOps-reconciled, welcome to the what3words platform.
+
+==> SUCCESS: a git commit reconciled through Argo CD and changed the cluster.
+=== done ===
