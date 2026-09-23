@@ -1,10 +1,10 @@
-=== Rolling update survival test: Wed Sep 23 08:04:24 +07 2026 ===
+=== Rolling update survival test: Wed Sep 23 10:35:59 +07 2026 ===
 target=http://prod.localhost  deployment=greeter-prod/greeter-prod
 
 ==> Pods before rollout:
-  greeter-prod-5ddbdcbd49-5jplg Running w3w-greeter-worker2
-  greeter-prod-5ddbdcbd49-mrssp Running w3w-greeter-worker2
-  greeter-prod-5ddbdcbd49-x994m Running w3w-greeter-worker2
+  greeter-prod-795cb9744c-9mwfn Running w3w-greeter-worker
+  greeter-prod-795cb9744c-ndb7v Running w3w-greeter-worker
+  greeter-prod-795cb9744c-p6trc Running w3w-greeter-worker2
 
 ==> Starting continuous load.
 ==> Triggering rolling restart of greeter-prod.
@@ -23,11 +23,11 @@ deployment "greeter-prod" successfully rolled out
 ==> Letting load run a few more seconds to settle.
 ==> Stopping load.
 ==> Pods after rollout:
-  greeter-prod-6c7f6fbdb8-6mbs6 Running w3w-greeter-worker
-  greeter-prod-6c7f6fbdb8-sxtz7 Running w3w-greeter-worker
-  greeter-prod-6c7f6fbdb8-xbg5q Running w3w-greeter-worker2
+  greeter-prod-69f67fc4f-4xvlw Running w3w-greeter-worker
+  greeter-prod-69f67fc4f-g96rv Running w3w-greeter-worker
+  greeter-prod-69f67fc4f-n9xsd Running w3w-greeter-worker2
 
 ==> Result across the rollout (expect 0 failed):
-  requests=739  ok(200)=739  failed=0  success_rate=100.00%
+  requests=745  ok(200)=745  failed=0  success_rate=100.00%
 
 === done ===

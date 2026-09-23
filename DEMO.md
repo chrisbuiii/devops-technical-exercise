@@ -4,12 +4,35 @@ This is a step-by-step script for a live demo. It assumes a **fresh macOS
 machine** with nothing but the source code, and walks through every task and
 extension in the order that tells the clearest story.
 
-Every command is copy-pasteable. Timings are rough (first run, cold caches).
-Nothing here touches the internet except pulling public images and pinned
-manifests.
+Every command is copy-pasteable. The timings below were measured on a real end
+to end run (see the table); a truly first-ever machine adds image/provider
+download time on top, called out where it matters.
 
-- Total run time end to end: ~15-20 minutes.
+- Total run time end to end: ~12 minutes measured; budget ~15-20 minutes on a
+  first-ever machine that still has to pull all images and provider plugins.
 - Everything runs locally in a `kind` cluster. No cloud account needed.
+
+### Measured timings (one full run)
+
+| Phase | Measured | First-ever machine adds |
+| --- | --- | --- |
+| `docker build` (Task 1) | ~15s | pull of golang + distroless base images |
+| `cluster/setup.sh` | ~30s | ~1.3GB kind node image pull (a couple of min) |
+| `cluster/install-ingress.sh` | ~30s | ingress-nginx image pull |
+| `deploy/build-and-load.sh` | ~10s | - |
+| `terraform init` (each env) | ~2s | helm provider download (~30-60s, once) |
+| `terraform apply` dev / prod | ~1s / ~30s | pods need ~30s warmup to report Ready |
+| `observability/install.sh` | ~30s | Prometheus image pull |
+| `observability/demo-alert.sh` | ~100s | - |
+| `survival/rolling-update.sh` | ~105s | - |
+| `survival/node-drain.sh` | ~40s | - |
+| `gitops/install.sh` | ~140s | Argo CD + gitea image pulls |
+| `gitops/demo-gitops.sh` | ~125s | - |
+
+Why `terraform apply` for dev looks instant: the helm release is created quickly
+and the app pod then spends its ~30s warmup becoming Ready in the background.
+prod is slower because it waits on three replicas. Give it ~30s after apply
+before the URL serves.
 
 ---
 
@@ -81,7 +104,8 @@ Talking points:
   else - no shell, no package manager.
 - It runs as a non-root user by default.
 
-Time: ~1-2 min (first build).
+Time: ~15s measured. A first-ever machine also pulls the golang and distroless
+base images, which adds a couple of minutes once.
 
 ---
 
@@ -109,7 +133,8 @@ Verify the nodes:
 kubectl get nodes -o wide
 ```
 
-Time: ~2-4 min.
+Time: ~1 min measured (cluster ~30s + ingress ~30s). A first-ever machine also
+pulls the ~1.3GB kind node image, which can add a couple of minutes once.
 
 ---
 
@@ -155,7 +180,9 @@ Note (only if your kubeconfig is not the default): the provider defaults to
 `~/.kube/config` and context `kind-w3w-greeter`, which is what a clean Mac gets.
 If `KUBECONFIG` points elsewhere, add `-var kubeconfig=$KUBECONFIG` to the apply.
 
-Time: ~2-3 min.
+Time: ~1 min measured for load + both applies. `terraform init` is instant here
+because the helm provider is cached; a first-ever machine downloads it once
+(~30-60s). After apply, give pods ~30s to finish warm-up before the URL serves.
 
 ---
 
@@ -212,7 +239,7 @@ Talking points:
 - The alert is on a **user-visible symptom** (sustained rate of 5xx), which is
   the kind of thing actually worth being paged for - not CPU.
 
-Time: ~2-3 min (mostly waiting for the alert to fire).
+Time: ~30s to install, then ~100s for the alert to reach firing.
 
 ---
 
@@ -242,7 +269,7 @@ Talking points:
   the evicted pods legally reschedule onto the surviving worker - the service
   self-heals to full replica count during the drain.
 
-Time: ~2-3 min each.
+Time: rolling update ~105s, node drain ~40s.
 
 ---
 
@@ -308,7 +335,8 @@ Talking points:
   `$values` ref - no forked chart.
 - Sync is automated with self-heal and prune: change git, the cluster follows.
 
-Time: ~3-5 min (Argo CD install is the slow part).
+Time: install ~140s (Argo CD is the slow part), demo ~125s (the greeting change
+rolls out across both pods sequentially).
 
 ---
 
