@@ -180,6 +180,33 @@ in production I would lengthen the window and tune the threshold to the service'
 normal error budget. `observability/demo-alert.sh` drives `/boom`, waits for the
 alert to reach `firing`, and prints the evidence.
 
+## Extension D (Prove it survives), as built
+
+The scripts in `survival/` put prod (3 replicas) under continuous load and
+capture what happens during a disruption. The evidence is committed under
+`survival/evidence/`.
+
+**Rolling update** (`rolling-update.sh`): a rolling restart under load completed
+with 739/739 requests succeeding, zero failures. `maxSurge=0/maxUnavailable=1`
+means one pod is replaced at a time; readiness gating keeps traffic off a new pod
+until it is warm, and graceful shutdown drains the old one. The result is a
+zero-downtime rollout.
+
+**Node drain** (`node-drain.sh`): draining a worker under load evicted its two
+pods; both were rescheduled onto the surviving worker and all five long-running
+in-flight `/work` requests returned 200. Across the whole test, 291/291 requests
+succeeded, zero failures.
+
+One thing worth calling out because it refines an earlier decision: I expected
+the hard topology spread to leave the evicted pods Pending until the node came
+back. It did not. Cordoning a node adds an `unschedulable` taint, and because the
+spread uses `nodeTaintsPolicy: Honor`, the cordoned node drops out of the skew
+calculation, so the evicted pods legally reschedule onto the remaining worker.
+That is a better outcome than I predicted: the service self-heals to full replica
+count on one node during the drain, then rebalances 2-1 once the node returns and
+the pods are next replaced. The trade-off noted earlier still stands for normal
+scheduling, but during a drain the combination behaves well.
+
 ## Extensions: the order I would do them, and why
 
 The order is B, then D, then A, then C.
