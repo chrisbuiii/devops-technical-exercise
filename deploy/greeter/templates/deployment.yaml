@@ -19,6 +19,12 @@ spec:
         # triggers a rolling update. Without this, a config-only change would
         # not restart the pods and the new values would never be picked up.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.metrics.enabled }}
+        # Opt this pod in to Prometheus pod-discovery scraping.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.service.targetPort | quote }}
+        prometheus.io/path: {{ .Values.metrics.path | quote }}
+        {{- end }}
       labels:
         {{- include "greeter.selectorLabels" . | nindent 8 }}
     spec:

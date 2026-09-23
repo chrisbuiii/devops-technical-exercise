@@ -160,6 +160,25 @@ host). Nothing about the deployment is duplicated between dev and prod.
   listed above as what I would add for production.
 - **A generated Helm scaffold.** The brief scores generated boilerplate at zero,
   and rightly. Everything in the chart is there because I put it there.
+- **Alertmanager and Grafana (Extension B).** The alert transitioning to firing
+  in Prometheus is enough to prove the rule works on a local cluster. Routing a
+  page (Alertmanager) and dashboards (Grafana) are what I would add next in a
+  real setup; here they would be moving parts without more evidence.
+
+## Extension B (Observability), as built
+
+I deployed a minimal, hand-written Prometheus (`observability/`) rather than a
+full stack, since the brief explicitly does not grade the size of the stack.
+Prometheus discovers greeter pods by the `prometheus.io/scrape` annotation the
+chart sets, scrapes `/metrics`, and evaluates one rule.
+
+The rule is `GreeterHighErrorRate`: the share of requests failing with 5xx over
+a 2m window exceeds 5%, held for 1m. I chose this because it tracks a real,
+user-visible symptom rather than a proxy like CPU, which is the kind of thing
+actually worth a page. The `for: 1m` is short so it demonstrates quickly;
+in production I would lengthen the window and tune the threshold to the service's
+normal error budget. `observability/demo-alert.sh` drives `/boom`, waits for the
+alert to reach `firing`, and prints the evidence.
 
 ## Extensions: the order I would do them, and why
 

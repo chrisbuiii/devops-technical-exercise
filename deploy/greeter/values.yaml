@@ -94,6 +94,13 @@ podDisruptionBudget:
   enabled: true
   minAvailable: 1
 
+# Expose the app's /metrics endpoint to Prometheus via pod annotations. The
+# minimal Prometheus in observability/ discovers pods by the scrape annotation,
+# so no per-service scrape config is needed.
+metrics:
+  enabled: true
+  path: /metrics
+
 # Probe tuning is driven by the app's documented behaviour:
 #   - /healthz is always 200 while the process is alive (including warm-up),
 #   - /readyz is 503 during warm-up and again during shutdown.

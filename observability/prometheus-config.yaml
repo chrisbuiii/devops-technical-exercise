@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    rule_files:
+      - /etc/prometheus/rules.yml
+
+    scrape_configs:
+      # Discover pods and scrape only those that opt in with the
+      # prometheus.io/scrape annotation (the greeter chart sets it). This is the
+      # classic annotation-driven pattern: no per-service config to maintain.
+      - job_name: greeter-pods
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          # Use the annotated metrics path if present.
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          # Point the scrape at the annotated port on the pod IP.
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          # Keep namespace and pod as labels so alerts can point at a workload.
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+
+  rules.yml: |
+    groups:
+      - name: greeter
+        rules:
+          # The one alert worth a page: a sustained share of requests are
+          # failing with 5xx. This tracks user-visible errors, not a proxy
+          # metric like CPU, so it fires when something is actually broken.
+          # 5% over a 2m window, held for 1m to ride out momentary spikes.
+          - alert: GreeterHighErrorRate
+            expr: |
+              sum(rate(greeter_http_requests_total{status=~"5.."}[2m]))
+                / sum(rate(greeter_http_requests_total[2m])) > 0.05
+            for: 1m
+            labels:
+              severity: page
+            annotations:
+              summary: "Greeter 5xx error ratio is above 5%"
+              description: "More than 5% of greeter requests have failed with 5xx for over a minute."

@@ -4,7 +4,7 @@ description: what3words greeter service - hand-written chart for the DevOps exer
 type: application
 
 # Chart version is independent of the app. Bump it when the templates change.
-version: 0.2.0
+version: 0.3.0
 
 # The default application version. Overridden per environment from Terraform,
 # and surfaced by the app on /version and in the greeter_build_info metric.
