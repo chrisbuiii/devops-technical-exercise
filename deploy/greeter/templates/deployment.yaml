@@ -32,6 +32,12 @@ spec:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: DoNotSchedule
+          # Exclude nodes the pod cannot land on from the skew calculation.
+          # Without this the tainted control-plane node counts as a zero-pod
+          # domain, so 3 replicas across 2 workers (2-1) is seen as skew 2 and
+          # the third pod never schedules. Honoring taints leaves only the two
+          # workers as domains, where 2-1 is a valid spread.
+          nodeTaintsPolicy: Honor
           labelSelector:
             matchLabels:
               {{- include "greeter.selectorLabels" . | nindent 14 }}
