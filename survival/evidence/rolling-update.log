@@ -1,0 +1,33 @@
+=== Rolling update survival test: Wed Sep 23 10:35:59 +07 2026 ===
+target=http://prod.localhost  deployment=greeter-prod/greeter-prod
+
+==> Pods before rollout:
+  greeter-prod-795cb9744c-9mwfn Running w3w-greeter-worker
+  greeter-prod-795cb9744c-ndb7v Running w3w-greeter-worker
+  greeter-prod-795cb9744c-p6trc Running w3w-greeter-worker2
+
+==> Starting continuous load.
+==> Triggering rolling restart of greeter-prod.
+deployment.apps/greeter-prod restarted
+Waiting for deployment "greeter-prod" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "greeter-prod" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "greeter-prod" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "greeter-prod" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "greeter-prod" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "greeter-prod" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "greeter-prod" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "greeter-prod" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "greeter-prod" rollout to finish: 2 of 3 updated replicas are available...
+deployment "greeter-prod" successfully rolled out
+
+==> Letting load run a few more seconds to settle.
+==> Stopping load.
+==> Pods after rollout:
+  greeter-prod-69f67fc4f-4xvlw Running w3w-greeter-worker
+  greeter-prod-69f67fc4f-g96rv Running w3w-greeter-worker
+  greeter-prod-69f67fc4f-n9xsd Running w3w-greeter-worker2
+
+==> Result across the rollout (expect 0 failed):
+  requests=745  ok(200)=745  failed=0  success_rate=100.00%
+
+=== done ===

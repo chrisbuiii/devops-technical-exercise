@@ -1,0 +1,40 @@
+=== Node drain survival test: Wed Sep 23 10:37:44 +07 2026 ===
+target=http://prod.localhost  node=w3w-greeter-worker  namespace=greeter-prod
+
+==> Pods before drain:
+  greeter-prod-69f67fc4f-4xvlw Running w3w-greeter-worker
+  greeter-prod-69f67fc4f-g96rv Running w3w-greeter-worker
+  greeter-prod-69f67fc4f-n9xsd Running w3w-greeter-worker2
+
+==> Starting continuous load.
+==> Baseline (8s of load before disruption):
+  requests=58  ok(200)=58  failed=0  success_rate=100.00%
+
+==> Firing 5 in-flight /work?ms=8000 requests that will straddle the drain.
+==> Draining w3w-greeter-worker (evicting its pods).
+node/w3w-greeter-worker cordoned
+Warning: ignoring DaemonSet-managed Pods: kube-system/kindnet-d7lmz, kube-system/kube-proxy-wgwkj
+evicting pod greeter-prod/greeter-prod-69f67fc4f-g96rv
+evicting pod greeter-prod/greeter-prod-69f67fc4f-4xvlw
+pod/greeter-prod-69f67fc4f-g96rv evicted
+pod/greeter-prod-69f67fc4f-4xvlw evicted
+node/w3w-greeter-worker drained
+
+==> Pods right after drain (the cordoned node is excluded from the spread, so the evicted pod reschedules onto the surviving node; the service keeps serving throughout):
+  greeter-prod-69f67fc4f-mpf2z Running w3w-greeter-worker2
+  greeter-prod-69f67fc4f-n9xsd Running w3w-greeter-worker2
+  greeter-prod-69f67fc4f-ppnjx Running w3w-greeter-worker2
+
+==> Waiting for the in-flight /work requests to return.
+  in-flight /work results (expect 200 = finished gracefully): 200 200 200 200 200 
+
+==> Uncordoning w3w-greeter-worker.
+Waiting for deployment "greeter-prod" rollout to finish: 1 of 3 updated replicas are available...
+Waiting for deployment "greeter-prod" rollout to finish: 2 of 3 updated replicas are available...
+deployment "greeter-prod" successfully rolled out
+
+==> Stopping load.
+==> Overall result across the whole test:
+  requests=300  ok(200)=300  failed=0  success_rate=100.00%
+
+=== done ===

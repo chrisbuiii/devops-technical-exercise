@@ -1,0 +1,11 @@
+# Values for the GitOps-managed environment. Argo CD layers this on top of the
+# chart's values.yaml. Editing this file and committing it is what drives a
+# change into the cluster - that is the whole point of the demo.
+config:
+  greetingName: "GitOps"
+replicaCount: 2
+ingress:
+  host: gitops.localhost
+image:
+  repository: greeter
+  tag: dev
